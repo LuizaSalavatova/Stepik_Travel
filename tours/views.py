@@ -1,59 +1,68 @@
+from django.http import HttpResponseNotFound, Http404, HttpResponse
 from django.shortcuts import render
 from django.views import View
-from django.http import Http404, HttpResponseNotFound, HttpResponseServerError
-from tours.date import departures, description, subtitle, title, tours
+import tours.date as data
+
 from random import sample
 
-
-def custom_handler404(request, exception):
-    return HttpResponseNotFound('Ошибка 404. Ой, что то сломалось... Простите извините!')
-
-
-def custom_handler500(request):
-    return HttpResponseServerError('Ошибка 500. Ой, что то сломалось... Простите извините!')
-
-
 class MainView(View):
-    def get(self, request, *args, **kwargs):
-        context = {
-            'title': title,
-            'subtitle': subtitle,
-            'description': description,
-            'tours': sample(tours.items(), 6),
-            'departures': departures.items(),
-        }
+    def get(self, request):
+        context = {'title': data.title,
+                   'subtitle': data.subtitle,
+                   'description': data.description,
+                   'departures': data.departures,
+                   'sample_tours': sample(data.tours.items(), 6)
+                   }
+
         return render(request, 'index.html', context=context)
 
 
 class DepartureView(View):
-    def get(self, request, departure, *args, **kwargs):
-        if departure not in departures.keys():
+    def get(self, request, departure):
+        if departure not in data.departures:
             raise Http404
-        context = {
-            'title': title,
-            'tours': [tour for tour in tours.items() if tour[1]["departure"] == departure],
-            'deparcity': departures[departure],
-            'departures': departures.items(),
-        }
 
-        context['tourscholko'] = len(context['tours'])
-        priceAndNights = [tour[1]['price'] for tour in context['tours']]
-        context['maxchena'] = max(priceAndNights)
-        context['minchena'] = min(priceAndNights)
-        priceAndNights = [tour[1]['nights'] for tour in context['tours']]
-        context['maxnigt'] = max(priceAndNights)
-        context['minnigt'] = min(priceAndNights)
+        tours_from_departure = {}
+        for tour_id, tour in data.tours.items():
+            if tour['departure'] == departure:
+                tours_from_departure[tour_id] = tour
+
+        tours_count = len(tours_from_departure)
+        tours_prices = sorted(tour['price'] for tour in tours_from_departure.values())
+        tours_nights = sorted(tour['nights'] for tour in tours_from_departure.values())
+
+        context = {'title': data.title,
+                   'departures': data.departures,
+                   'departure_title': data.departures[departure],
+                   'tours_count': tours_count,
+                   'min_price_tour': tours_prices[0],
+                   'max_price_tour': tours_prices[-1],
+                   'min_nights_tour': tours_nights[0],
+                   'max_nights_tour': tours_nights[-1],
+                   'tours_from_departure': tours_from_departure,
+                   }
         return render(request, 'departure.html', context=context)
 
 
 class TourView(View):
-    def get(self, request, id, *args, **kwargs):
-        if id not in tours:
+    def get(self, request, tour_id):
+        if tour_id not in data.tours:
             raise Http404
-        context = {
-            'title': title,
-            'tour': tours[id],
-            'deparcity': departures[tours[id]['departure']],
-            'departures': departures.items(),
-        }
-        return render(request, 'tour.html', context=context)
+
+        tour_data = data.tours[tour_id]
+        departure_title = data.departures[tour_data['departure']]
+
+        context = {'title': data.title,
+                   'departures': data.departures,
+                   'departure_title': departure_title,
+                   'tour': tour_data,
+                   }
+        return render(request, 'tour.html', context)
+
+
+def custom_handler404(request, exception):
+    return HttpResponseNotFound('Ой, что то сломалось... Ошибка 404, Простите извините!')
+
+
+def custom_handler500(request):
+    return HttpResponse("Ой, что то сломалось... Ошибка 500, Простите извините!")
