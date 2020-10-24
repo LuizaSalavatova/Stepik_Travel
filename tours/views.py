@@ -5,6 +5,7 @@ import tours.date as data
 
 from random import sample
 
+
 class MainView(View):
     def get(self, request):
         context = {'title': data.title,
